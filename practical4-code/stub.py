@@ -1,6 +1,8 @@
 # Imports.
 import numpy as np
 import numpy.random as npr
+import cPickle as pickle
+import matplotlib.pyplot as plt
 
 from SwingyMonkey import SwingyMonkey
 
@@ -15,12 +17,36 @@ class Learner(object):
         self.last_action = None
         self.last_reward = None
         self.gravity = None
+        self.init_val = 5
+        self.learning_rate = 0.5
+        self.discount = 1
+        self.Q = dict()
+        self.epsilon = lambda t : float(1) / t
+        self.t = 0
 
     def reset(self):
         self.last_state  = None
         self.last_action = None
         self.last_reward = None
         self.gravity = None
+        self.t = 0
+
+    def __dist_convert(self, velocity, acceleration, height):
+        t1 = float(-velocity + np.sqrt(velocity**2 + 2*acceleration*height)) / acceleration
+        t2 = float(-velocity - np.sqrt(velocity**2 + 2*acceleration*height)) / acceleration
+        return max(t1, t2)
+
+    def __state_convert(self, state):
+        bottom_diff = state['tree']['bot'] - state['monkey']['bot']
+        top_diff = state['tree']['top'] - state['monkey']['top']
+        velocity = state['monkey']['vel']
+        bottom_tree_time = self.__dist_convert(velocity, -self.gravity, bottom_diff)
+        #bottom_time = float(velocity + np.sqrt(velocity**2 - 2*self.gravity*bottom_diff)) / self.gravity
+        top_tree_time = self.__dist_convert(velocity, -self.gravity, top_diff)
+        #top_time = float(velocity + np.sqrt(velocity**2 - 2*self.gravity*top_diff)) / self.gravity
+        bottom_time = self.__dist_convert(velocity, -self.gravity, -state['monkey']['bot'])
+        #round = lambda x : int(x) if not np.isnan(x) else np.nan
+        return round(0.01*bottom_tree_time), round(0.01*top_tree_time), round(0.01*bottom_time), round(0.01*state['tree']['dist'])
 
     def action_callback(self, state):
         '''
@@ -33,12 +59,37 @@ class Learner(object):
         # You'll need to select and action and return it.
         # Return 0 to swing and 1 to jump.
 
-        new_action = npr.rand() < 0.1
         new_state  = state
+        self.t += 1
+
         if self.gravity is None and self.last_state is not None:
             if state['monkey']['vel'] < self.last_state['monkey']['vel']:
                 self.gravity = self.last_state['monkey']['vel'] - state['monkey']['vel']
-                print self.gravity
+                #print self.gravity
+
+        new_action = npr.rand() < 0.1
+        if self.gravity is not None:
+            state_rep_old = self.__state_convert(self.last_state)
+            state_rep_new = self.__state_convert(new_state)
+
+            if (state_rep_new, 0) not in self.Q:
+                self.Q[(state_rep_new, 0)] = self.init_val
+            #else:
+            #    print 'found existing!'
+            if (state_rep_new, 1) not in self.Q:
+                self.Q[(state_rep_new, 1)] = self.init_val
+            if npr.rand() < self.epsilon(self.t):
+                new_action = npr.choice([0, 1])
+            else:
+                new_action = np.argmax([self.Q[(state_rep_new, 0)], self.Q[(state_rep_new, 1)]])
+
+            if (state_rep_old, int(self.last_action)) not in self.Q:
+                self.Q[(state_rep_old, int(self.last_action))] = self.init_val
+            if (state_rep_new, int(new_action)) not in self.Q:
+                self.Q[(state_rep_new, int(new_action))] = self.init_val
+            td = self.last_reward + self.discount * self.Q[(state_rep_new, int(new_action))] - self.Q[(state_rep_old, int(self.last_action))]
+            self.Q[(state_rep_old, int(self.last_action))] += self.learning_rate * td
+
 
         self.last_action = new_action
         self.last_state  = new_state
@@ -56,8 +107,11 @@ def run_games(learner, hist, iters = 100, t_len = 100):
     Driver function to simulate learning by having the agent play a sequence of games.
     '''
     
+    game_lengths = []
+    dict_lengths = [0]
+    scores = []
     for ii in range(iters):
-        print 'NEW GAME'
+        print 'NEW GAME %d' % (ii)
         # Make a new monkey object.
         swing = SwingyMonkey(sound=False,                  # Don't play sounds.
                              text="Epoch %d" % (ii),       # Display the epoch on screen.
@@ -68,20 +122,35 @@ def run_games(learner, hist, iters = 100, t_len = 100):
         # Loop until you hit something.
         i = 0
         while swing.game_loop():
-            print swing.get_state()
-            #if i == 0:
-            #    start_state = swing.get_state()
-            #if i == 1:
-            #    print swing.get_state()['monkey']['vel'] - start_state['monkey']['vel']
             i += 1
-        
+
         # Save score history.
         hist.append(swing.score)
 
+        k = learner.Q.keys()
+        #k.sort()
+        #print k
+        print 'total time: %d' % learner.t
+        game_lengths.append(learner.t)
+        print 'dict length: %d' % len(learner.Q)
+        dict_lengths.append(len(learner.Q))
+        print 'score: %d' % swing.score
+        scores.append(swing.score)
+        print
+        print
         # Reset the state of the learner.
         learner.reset()
         print
         
+    pickle.dump(learner.Q, open('dict.p', 'w'))
+    plt.plot(range(iters), game_lengths)
+    plt.show()
+    plt.plot(range(iters+1), dict_lengths)
+    plt.show()
+    plt.plot(range(iters), scores)
+    plt.show()
+    #d = pickle.load(open('C:\\Users\\Madhu\\Dropbox\\School \'15-\'16\\Semester 2\\CS 181\\cs181-practical4\\practical4-code\\dict.p', 'r'))
+    #len(d)
     return
 
 
@@ -94,7 +163,7 @@ if __name__ == '__main__':
 	hist = []
 
 	# Run games. 
-	run_games(agent, hist, 20, 10)
+	run_games(agent, hist, 1000, 0)
 
 	# Save history. 
 	np.save('hist',np.array(hist))
