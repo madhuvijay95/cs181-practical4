@@ -3,6 +3,7 @@ import numpy as np
 import numpy.random as npr
 import cPickle as pickle
 import matplotlib.pyplot as plt
+import sys
 
 from SwingyMonkey import SwingyMonkey
 
@@ -18,10 +19,10 @@ class Learner(object):
         self.last_reward = None
         self.gravity = None
         self.init_val = 5
-        self.learning_rate = 0.5
+        self.learning_rate = lambda t : float(1) / t
         self.discount = 1
         self.Q = dict()
-        self.epsilon = lambda t : float(1) / t
+        self.epsilon = lambda t : float(1) / np.sqrt(t)
         self.t = 0
 
     def reset(self):
@@ -29,7 +30,6 @@ class Learner(object):
         self.last_action = None
         self.last_reward = None
         self.gravity = None
-        self.t = 0
 
     def __dist_convert(self, velocity, acceleration, height):
         t1 = float(-velocity + np.sqrt(velocity**2 + 2*acceleration*height)) / acceleration
@@ -45,8 +45,9 @@ class Learner(object):
         top_tree_time = self.__dist_convert(velocity, -self.gravity, top_diff)
         #top_time = float(velocity + np.sqrt(velocity**2 - 2*self.gravity*top_diff)) / self.gravity
         bottom_time = self.__dist_convert(velocity, -self.gravity, -state['monkey']['bot'])
-        #round = lambda x : int(x) if not np.isnan(x) else np.nan
-        return round(0.01*bottom_tree_time), round(0.01*top_tree_time), round(0.01*bottom_time), round(0.01*state['tree']['dist'])
+        round_nan = lambda x : round(x) if not np.isnan(x) else sys.maxint
+        return round_nan(0.25*bottom_tree_time), round_nan(0.25*top_tree_time), round_nan(0.25*bottom_time),\
+               round_nan(0.1*state['tree']['dist'])
 
     def action_callback(self, state):
         '''
@@ -72,12 +73,16 @@ class Learner(object):
             state_rep_old = self.__state_convert(self.last_state)
             state_rep_new = self.__state_convert(new_state)
 
+            # initialize any relevant missing values in the Q table
+            if (state_rep_old, 0) not in self.Q:
+                self.Q[(state_rep_old, 0)] = self.init_val
+            if (state_rep_old, 1) not in self.Q:
+                self.Q[(state_rep_old, 1)] = self.init_val
             if (state_rep_new, 0) not in self.Q:
                 self.Q[(state_rep_new, 0)] = self.init_val
-            #else:
-            #    print 'found existing!'
             if (state_rep_new, 1) not in self.Q:
                 self.Q[(state_rep_new, 1)] = self.init_val
+
             if npr.rand() < self.epsilon(self.t):
                 new_action = npr.choice([0, 1])
             else:
@@ -85,10 +90,9 @@ class Learner(object):
 
             if (state_rep_old, int(self.last_action)) not in self.Q:
                 self.Q[(state_rep_old, int(self.last_action))] = self.init_val
-            if (state_rep_new, int(new_action)) not in self.Q:
-                self.Q[(state_rep_new, int(new_action))] = self.init_val
-            td = self.last_reward + self.discount * self.Q[(state_rep_new, int(new_action))] - self.Q[(state_rep_old, int(self.last_action))]
-            self.Q[(state_rep_old, int(self.last_action))] += self.learning_rate * td
+            td = self.last_reward + self.discount * max(self.Q[(state_rep_new, 0)], self.Q[(state_rep_new, 1)])\
+                 - self.Q[(state_rep_old, int(self.last_action))]
+            self.Q[(state_rep_old, int(self.last_action))] += self.learning_rate(self.t) * td
 
 
         self.last_action = new_action
@@ -163,7 +167,7 @@ if __name__ == '__main__':
 	hist = []
 
 	# Run games. 
-	run_games(agent, hist, 1000, 0)
+	run_games(agent, hist, 500, 0)
 
 	# Save history. 
 	np.save('hist',np.array(hist))
