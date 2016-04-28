@@ -19,10 +19,11 @@ class Learner(object):
         self.last_reward = None
         self.gravity = None
         self.init_val = 5
-        self.learning_rate = lambda t : float(1) / t
+        self.learning_rate = lambda t : 0.2
+        #self.learning_rate = lambda t : t ** (-0.51)
         self.discount = 1
         self.Q = dict()
-        self.epsilon = lambda t : float(1) / np.sqrt(t)
+        self.epsilon = lambda t : t ** (-1)
         self.t = 0
 
     def reset(self):
@@ -46,8 +47,8 @@ class Learner(object):
         #top_time = float(velocity + np.sqrt(velocity**2 - 2*self.gravity*top_diff)) / self.gravity
         bottom_time = self.__dist_convert(velocity, -self.gravity, -state['monkey']['bot'])
         round_nan = lambda x : round(x) if not np.isnan(x) else sys.maxint
-        return round_nan(0.25*bottom_tree_time), round_nan(0.25*top_tree_time), round_nan(0.25*bottom_time),\
-               round_nan(0.1*state['tree']['dist'])
+        return round_nan(0.25*bottom_tree_time), round_nan(0.25*top_tree_time),\
+               round_nan(0.25*bottom_time), round_nan(0.1*state['tree']['dist'])
 
     def action_callback(self, state):
         '''
@@ -78,6 +79,8 @@ class Learner(object):
                 self.Q[(state_rep_old, 0)] = self.init_val
             if (state_rep_old, 1) not in self.Q:
                 self.Q[(state_rep_old, 1)] = self.init_val
+            #if (state_rep_old, int(self.last_action)) not in self.Q:
+            #    self.Q[(state_rep_old, int(self.last_action))] = self.init_val
             if (state_rep_new, 0) not in self.Q:
                 self.Q[(state_rep_new, 0)] = self.init_val
             if (state_rep_new, 1) not in self.Q:
@@ -88,8 +91,6 @@ class Learner(object):
             else:
                 new_action = np.argmax([self.Q[(state_rep_new, 0)], self.Q[(state_rep_new, 1)]])
 
-            if (state_rep_old, int(self.last_action)) not in self.Q:
-                self.Q[(state_rep_old, int(self.last_action))] = self.init_val
             td = self.last_reward + self.discount * max(self.Q[(state_rep_new, 0)], self.Q[(state_rep_new, 1)])\
                  - self.Q[(state_rep_old, int(self.last_action))]
             self.Q[(state_rep_old, int(self.last_action))] += self.learning_rate(self.t) * td
@@ -111,9 +112,9 @@ def run_games(learner, hist, iters = 100, t_len = 100):
     Driver function to simulate learning by having the agent play a sequence of games.
     '''
     
-    game_lengths = []
     dict_lengths = [0]
     scores = []
+    max_scores = []
     for ii in range(iters):
         print 'NEW GAME %d' % (ii)
         # Make a new monkey object.
@@ -134,12 +135,12 @@ def run_games(learner, hist, iters = 100, t_len = 100):
         k = learner.Q.keys()
         #k.sort()
         #print k
-        print 'total time: %d' % learner.t
-        game_lengths.append(learner.t)
         print 'dict length: %d' % len(learner.Q)
         dict_lengths.append(len(learner.Q))
         print 'score: %d' % swing.score
         scores.append(swing.score)
+        print 'max score: %d' % max(scores)
+        max_scores.append(max(scores))
         print
         print
         # Reset the state of the learner.
@@ -147,14 +148,30 @@ def run_games(learner, hist, iters = 100, t_len = 100):
         print
         
     pickle.dump(learner.Q, open('dict.p', 'w'))
-    plt.plot(range(iters), game_lengths)
-    plt.show()
     plt.plot(range(iters+1), dict_lengths)
     plt.show()
     plt.plot(range(iters), scores)
+    plt.get_current_fig_manager().window.showMaximized()
+    plt.savefig('scores.png')
+    plt.show()
+    plt.plot(range(iters), max_scores)
     plt.show()
     #d = pickle.load(open('C:\\Users\\Madhu\\Dropbox\\School \'15-\'16\\Semester 2\\CS 181\\cs181-practical4\\practical4-code\\dict.p', 'r'))
     #len(d)
+
+    # demonstrate the learner playing the game
+    max_score = 0
+    while max_score < 10:
+        # Make a new monkey object.
+        swing = SwingyMonkey(tick_length=50,
+                             action_callback=learner.action_callback,
+                             reward_callback=learner.reward_callback)
+
+        # Loop until you hit something.
+        i = 0
+        while swing.game_loop():
+            i += 1
+        max_score = swing.score
     return
 
 
@@ -167,7 +184,7 @@ if __name__ == '__main__':
 	hist = []
 
 	# Run games. 
-	run_games(agent, hist, 500, 0)
+	run_games(agent, hist, 300, 0)
 
 	# Save history. 
 	np.save('hist',np.array(hist))
