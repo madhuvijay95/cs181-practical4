@@ -47,8 +47,15 @@ class Learner(object):
         #top_time = float(velocity + np.sqrt(velocity**2 - 2*self.gravity*top_diff)) / self.gravity
         bottom_time = self.__dist_convert(velocity, -self.gravity, -state['monkey']['bot'])
         round_nan = lambda x : round(x) if not np.isnan(x) else sys.maxint
-        return round_nan(0.25*bottom_tree_time), round_nan(0.25*top_tree_time),\
-               round_nan(0.25*bottom_time), round_nan(0.1*state['tree']['dist'])
+
+        #return self.gravity, round_nan(0.1*state['tree']['dist']), round_nan(0.1*state['monkey']['vel']), \
+        #       round_nan(0.05*(state['tree']['top']-state['monkey']['top']))
+
+        #return self.gravity, round_nan(0.02*state['tree']['dist']), round_nan(0.05*state['tree']['top']), \
+        #       round_nan(0.1*state['monkey']['vel']), round_nan(0.02*state['monkey']['top'])
+
+        return self.gravity, round_nan(0.25*bottom_tree_time), round_nan(0.25*top_tree_time), round_nan(0.25*bottom_time), \
+               round_nan(0.1*state['tree']['dist'])
 
     def action_callback(self, state):
         '''
@@ -79,15 +86,13 @@ class Learner(object):
                 self.Q[(state_rep_old, 0)] = self.init_val
             if (state_rep_old, 1) not in self.Q:
                 self.Q[(state_rep_old, 1)] = self.init_val
-            #if (state_rep_old, int(self.last_action)) not in self.Q:
-            #    self.Q[(state_rep_old, int(self.last_action))] = self.init_val
             if (state_rep_new, 0) not in self.Q:
                 self.Q[(state_rep_new, 0)] = self.init_val
             if (state_rep_new, 1) not in self.Q:
                 self.Q[(state_rep_new, 1)] = self.init_val
 
             if npr.rand() < self.epsilon(self.t):
-                new_action = npr.choice([0, 1])
+                new_action = npr.choice([0,1])
             else:
                 new_action = np.argmax([self.Q[(state_rep_new, 0)], self.Q[(state_rep_new, 1)]])
 
@@ -115,6 +120,8 @@ def run_games(learner, hist, iters = 100, t_len = 100):
     dict_lengths = [0]
     scores = []
     max_scores = []
+    scores1 = []
+    scores4 = []
     for ii in range(iters):
         print 'NEW GAME %d' % (ii)
         # Make a new monkey object.
@@ -139,13 +146,16 @@ def run_games(learner, hist, iters = 100, t_len = 100):
         dict_lengths.append(len(learner.Q))
         print 'score: %d' % swing.score
         scores.append(swing.score)
+        if swing.gravity == 1:
+            scores1.append(swing.score)
+        elif swing.gravity == 4:
+            scores4.append(swing.score)
         print 'max score: %d' % max(scores)
         max_scores.append(max(scores))
         print
         print
         # Reset the state of the learner.
         learner.reset()
-        print
         
     pickle.dump(learner.Q, open('dict.p', 'w'))
     plt.plot(range(iters+1), dict_lengths)
@@ -156,6 +166,27 @@ def run_games(learner, hist, iters = 100, t_len = 100):
     plt.show()
     plt.plot(range(iters), max_scores)
     plt.show()
+
+    window = 50
+    ma = np.convolve(scores, np.ones(window)/window, mode='valid')
+    plt.plot(range(len(ma)), ma)
+    plt.get_current_fig_manager().window.showMaximized()
+    plt.savefig('scores_ma.png')
+    plt.show()
+
+    print 'gravity=1: %d games, average score %.3f' % (len(scores1), np.mean(scores1))
+    print 'gravity=4: %d games, average score %.3f' % (len(scores4), np.mean(scores4))
+    print 'all: %.3f' % np.mean(scores)
+    plt.plot(range(len(scores1)), scores1)
+    plt.show()
+    plt.plot(range(len(scores4)), scores4)
+    plt.show()
+    window = 25
+    ma1 = np.convolve(scores1, np.ones(window)/window, mode='valid')
+    plt.plot(range(len(ma1)), ma1)
+    ma4 = np.convolve(scores4, np.ones(window)/window, mode='valid')
+    plt.plot(range(len(ma4)), ma4)
+    pickle.dump((scores, scores1, scores4), open('scores.p', 'w'))
     #d = pickle.load(open('C:\\Users\\Madhu\\Dropbox\\School \'15-\'16\\Semester 2\\CS 181\\cs181-practical4\\practical4-code\\dict.p', 'r'))
     #len(d)
 
@@ -163,7 +194,8 @@ def run_games(learner, hist, iters = 100, t_len = 100):
     max_score = 0
     while max_score < 10:
         # Make a new monkey object.
-        swing = SwingyMonkey(tick_length=50,
+        swing = SwingyMonkey(sound=False,
+                             tick_length=50,
                              action_callback=learner.action_callback,
                              reward_callback=learner.reward_callback)
 
@@ -172,6 +204,7 @@ def run_games(learner, hist, iters = 100, t_len = 100):
         while swing.game_loop():
             i += 1
         max_score = swing.score
+        learner.reset()
     return
 
 
@@ -184,9 +217,8 @@ if __name__ == '__main__':
 	hist = []
 
 	# Run games. 
-	run_games(agent, hist, 300, 0)
+	run_games(agent, hist, 500, 0)
 
 	# Save history. 
 	np.save('hist',np.array(hist))
-
 
