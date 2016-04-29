@@ -1,3 +1,5 @@
+
+
 # Imports.
 import numpy as np
 import numpy.random as npr
@@ -9,10 +11,6 @@ from SwingyMonkey import SwingyMonkey
 
 
 class Learner(object):
-    '''
-    This agent jumps randomly.
-    '''
-
     def __init__(self):
         self.last_state  = None
         self.last_action = None
@@ -20,7 +18,6 @@ class Learner(object):
         self.gravity = None
         self.init_val = 5
         self.learning_rate = lambda t : 0.2
-        #self.learning_rate = lambda t : t ** (-0.51)
         self.discount = 1
         self.Q = dict()
         self.epsilon = lambda t : t ** (-1)
@@ -60,8 +57,8 @@ class Learner(object):
         # the level of gravity, the distance to the next, tree, the height of the tree, the velocity of the monkey, and
         # the height of the monkey (all of which were rounded sufficiently to compress the state space).
         # As explained in the write-up, this approach was less successful than the un-commented method.
-        #return self.gravity, round_nan(0.1*state['tree']['dist']), round_nan(0.05*state['tree']['top']), \
-        #       round_nan(0.1*state['monkey']['vel']), round_nan(0.05*state['monkey']['top'])
+        #return self.gravity, round_nan(0.1*state['tree']['dist']), round_nan(0.02*state['tree']['top']), \
+        #       round_nan(0.2*state['monkey']['vel']), round_nan(0.02*state['monkey']['top'])
 
         # Represent a state as: (1) gravity strength, (2) bottom_tree_time (rounded to the nearest multiple of 4);
         # (2) top_tree_time (rounded to the nearest multiple of 4); (3) bottom_time (rounded to the nearest multiple
@@ -127,13 +124,10 @@ def run_games(learner, iters = 100, t_len = 100):
     Driver function to simulate learning by having the agent play a sequence of games.
     '''
     
-    #dict_lengths = [0]
     scores = []
-    #max_scores = []
     scores1 = []
     scores4 = []
     for ii in range(iters):
-        #print 'NEW GAME %d' % (ii)
         # Make a new monkey object.
         swing = SwingyMonkey(sound=False,                  # Don't play sounds.
                              text="Epoch %d" % (ii),       # Display the epoch on screen.
@@ -148,33 +142,21 @@ def run_games(learner, iters = 100, t_len = 100):
         # Save score history.
         hist.append(swing.score)
 
-        #k = learner.Q.keys()
-        #print 'dict length: %d' % len(learner.Q)
-        #dict_lengths.append(len(learner.Q))
-        #print 'score: %d' % swing.score
         scores.append(swing.score)
         if swing.gravity == 1:
             scores1.append(swing.score)
         elif swing.gravity == 4:
             scores4.append(swing.score)
-        #print 'max score: %d' % max(scores)
-        #max_scores.append(max(scores))
-        #print
-        #print
         # Reset the state of the learner.
         learner.reset()
         
-    #pickle.dump(learner.Q, open('dict.p', 'w'))
-    #plt.plot(range(iters+1), dict_lengths)
-    #plt.show()
     # plot the game scores over time, and save to a png
     plt.plot(range(iters), scores)
     plt.title('Scores')
     plt.get_current_fig_manager().window.showMaximized()
     plt.savefig('scores.png')
     plt.show()
-    #plt.plot(range(iters), max_scores)
-    #plt.show()
+    plt.close()
 
     window = 50
     # compute a moving average of the score
@@ -184,23 +166,13 @@ def run_games(learner, iters = 100, t_len = 100):
     plt.get_current_fig_manager().window.showMaximized()
     plt.savefig('scores_ma.png')
     plt.show()
+    plt.close()
 
     print 'When gravity=1: %d games, with an average score of %.3f' % (len(scores1), np.mean(scores1))
     print 'When gravity=4: %d games, with an average score of %.3f' % (len(scores4), np.mean(scores4))
     print 'For all games: %d games, with an average score of %.3f' % (len(scores), np.mean(scores))
-    #plt.plot(range(len(scores1)), scores1)
-    #plt.show()
-    #plt.plot(range(len(scores4)), scores4)
-    #plt.show()
-    #window = 25
-    #ma1 = np.convolve(scores1, np.ones(window)/window, mode='valid')
-    #plt.plot(range(len(ma1)), ma1)
-    #ma4 = np.convolve(scores4, np.ones(window)/window, mode='valid')
-    #plt.plot(range(len(ma4)), ma4)
     # store the scores in a pickle file
     pickle.dump((scores, scores1, scores4), open('scores.p', 'w'))
-    #d = pickle.load(open('C:\\Users\\Madhu\\Dropbox\\School \'15-\'16\\Semester 2\\CS 181\\cs181-practical4\\practical4-code\\dict.p', 'r'))
-    #len(d)
     return
 
 
