@@ -106,9 +106,9 @@ class Learner(object):
                  - self.Q[(state_rep_old, int(self.last_action))]
             # update the Q dictionary value using the learning rate alpha_t and the temporal difference error td
             self.Q[(state_rep_old, int(self.last_action))] += self.learning_rate(self.t) * td
+
         else:
             new_action = npr.choice([0,1])
-
 
         self.last_action = new_action
         self.last_state  = state
@@ -127,9 +127,9 @@ def run_games(learner, iters = 100, t_len = 100):
     Driver function to simulate learning by having the agent play a sequence of games.
     '''
     
-    dict_lengths = [0]
+    #dict_lengths = [0]
     scores = []
-    max_scores = []
+    #max_scores = []
     scores1 = []
     scores4 = []
     for ii in range(iters):
@@ -158,7 +158,7 @@ def run_games(learner, iters = 100, t_len = 100):
         elif swing.gravity == 4:
             scores4.append(swing.score)
         #print 'max score: %d' % max(scores)
-        max_scores.append(max(scores))
+        #max_scores.append(max(scores))
         #print
         #print
         # Reset the state of the learner.
