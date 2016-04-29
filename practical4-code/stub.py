@@ -18,7 +18,7 @@ class Learner(object):
         self.last_action = None
         self.last_reward = None
         self.gravity = None
-        self.init_val = 20
+        self.init_val = 5
         self.learning_rate = lambda t : 0.2
         #self.learning_rate = lambda t : t ** (-0.51)
         self.discount = 1
@@ -56,17 +56,18 @@ class Learner(object):
         # function that rounds to the nearest integer, while casting NaN's as sys.maxint (the highest storable int)
         round_nan = lambda x : round(x) if not np.isnan(x) else sys.maxint
 
-        #return self.gravity, round_nan(0.1*state['tree']['dist']), round_nan(0.1*state['monkey']['vel']), \
-        #       round_nan(0.05*(state['tree']['top']-state['monkey']['top']))
+        # The following code shows an example of a more straightforward way to encode the state space, by simply using
+        # the level of gravity, the distance to the next, tree, the height of the tree, the velocity of the monkey, and
+        # the height of the monkey (all of which were rounded sufficiently to compress the state space).
+        # As explained in the write-up, this approach was less successful than the un-commented method.
+        #return self.gravity, round_nan(0.1*state['tree']['dist']), round_nan(0.05*state['tree']['top']), \
+        #       round_nan(0.1*state['monkey']['vel']), round_nan(0.05*state['monkey']['top'])
 
-        #return self.gravity, round_nan(0.1*state['tree']['dist']), round_nan(0.02*state['tree']['top']), \
-        #       round_nan(0.1*state['monkey']['vel']), round_nan(0.02*state['monkey']['top'])
-
-        # Represent a state as: (1) bottom_tree_time (rounded to the nearest multiple of 4); (2) top_tree_time (rounded
-        # to the nearest multiple of 4); (3) bottom_time (rounded to the nearest multiple of 4); and (4) the distance to
-        # the tree (rounded to the nearest multiple of 10).
-        return round_nan(0.25*bottom_tree_time), round_nan(0.25*top_tree_time), round_nan(0.25*bottom_time), \
-               round_nan(0.1*state['tree']['dist'])
+        # Represent a state as: (1) gravity strength, (2) bottom_tree_time (rounded to the nearest multiple of 4);
+        # (2) top_tree_time (rounded to the nearest multiple of 4); (3) bottom_time (rounded to the nearest multiple
+        # of 4); and (4) the distance to the tree (rounded to the nearest multiple of 10).
+        return self.gravity, round_nan(0.25*bottom_tree_time), round_nan(0.25*top_tree_time), \
+               round_nan(0.25*bottom_time), round_nan(0.1*state['tree']['dist'])
 
     # Function that uses Q-learning based on the current and past state, and returns action decisions.
     def action_callback(self, state):
@@ -106,7 +107,6 @@ class Learner(object):
                  - self.Q[(state_rep_old, int(self.last_action))]
             # update the Q dictionary value using the learning rate alpha_t and the temporal difference error td
             self.Q[(state_rep_old, int(self.last_action))] += self.learning_rate(self.t) * td
-
         else:
             new_action = npr.choice([0,1])
 
@@ -232,7 +232,7 @@ if __name__ == '__main__':
     hist = []
 
     # Run games to train the agent.
-    run_games(agent, iters=250, t_len=0)
+    run_games(agent, iters=500, t_len=0)
 
     # Play 3 sample games at a lower speed to demonstrate the agent.
     sim_games(agent, iters=3, t_len=50)
